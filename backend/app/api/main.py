@@ -12,7 +12,7 @@ app = FastAPI(title=settings.PROJECT_NAME)
 setup_cors(app)
 
 # Ensure uploads directory exists for StaticFiles mounting
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "app/uploads")
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 

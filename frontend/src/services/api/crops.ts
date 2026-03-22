@@ -13,6 +13,23 @@ export interface CropData {
   plot_index?: number;
   created_at?: string;
   is_active?: boolean;
+  analytics?: {
+    days_to_harvest: number;
+    progress_percent: number;
+    base_yield_kg: number;
+    predicted_yield_kg: number;
+    health_score_percent: number;
+    recommended_rotation: { crop: string, reason: string }[];
+    penalties: { metric: string, impact_kg: number, reason: string }[];
+    ideal_bounds: {
+        ideal_n: [number, number];
+        ideal_p: [number, number];
+        ideal_k: [number, number];
+        ideal_temp: [number, number];
+        ideal_humidity: [number, number];
+        ideal_ph: [number, number];
+    };
+  };
 }
 
 export const fetchCrops = async (): Promise<CropData[]> => {

@@ -18,6 +18,7 @@ class CropData(CropDataCreate):
     user_email: str
     created_at: datetime
     is_active: bool = True
+    analytics: dict | None = None
 
     class Config:
         from_attributes = True
