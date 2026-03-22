@@ -11,3 +11,5 @@ mongo_db = mongo_client["agri_portal"]
 
 # Collections
 crop_collection = mongo_db["crop_data"]
+user_profiles_collection = mongo_db["user_profiles"]
+farms_collection = mongo_db["farms"]

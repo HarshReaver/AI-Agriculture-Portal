@@ -1,23 +1,36 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchCrops, CropData } from "../../services/api/crops"
+import { fetchCrops, CropData } from "../../services/api/crops";
+import { getProfile, FarmInfo } from "../../services/api/users";
 import AddCropModal from "./components/AddCropModal";
+import PlotGrid from "./components/PlotGrid";
 import { useRouter } from "next/navigation";
 import { getToken } from "../../services/api/auth";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 export default function DashboardPage() {
   const [crops, setCrops] = useState<CropData[]>([]);
+  const [farm, setFarm] = useState<FarmInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const router = useRouter();
 
+  // Realtime sensor polling
+  const [sensorData, setSensorData] = useState<any[]>([]);
+
   const loadCrops = async () => {
     setLoading(true);
     try {
+      const profileResponse = await getProfile();
+      setFarm(profileResponse.farm);
       const data = await fetchCrops();
       setCrops(data);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === "Needs Setup") {
+        router.push("/setup");
+        return;
+      }
       console.error("Error loading crops:", error);
     } finally {
       setLoading(false);
@@ -30,6 +43,25 @@ export default function DashboardPage() {
       return;
     }
     loadCrops();
+
+    // Sensor Polling Loop
+    const fetchSensors = async () => {
+      try {
+        const token = getToken();
+        if (!token) return;
+        const res = await fetch('http://localhost:8000/api/sensors/', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSensorData(data);
+        }
+      } catch (e) { }
+    };
+
+    fetchSensors();
+    const interval = setInterval(fetchSensors, 5000);
+    return () => clearInterval(interval);
   }, [router]);
 
   return (
@@ -37,7 +69,7 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-olive-900 tracking-tight">Farmer Dashboard</h1>
-          <p className="text-olive-600 mt-1">Manage your crop data and monitor yields.</p>
+          <p className="text-olive-600 mt-1">Manage your crop data and monitor live sensor yields visually.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
@@ -49,76 +81,77 @@ export default function DashboardPage() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-pulse">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="bg-white rounded-2xl border border-olive-100 p-6 h-64"></div>
-          ))}
-        </div>
-      ) : crops.length === 0 ? (
-        <div className="bg-olive-50 rounded-3xl border border-olive-200 border-dashed p-12 text-center flex flex-col items-center justify-center min-h-[400px]">
-          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-4 shadow-sm text-olive-400">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" /><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" /></svg>
+        <div className="animate-pulse space-y-8">
+          <div className="h-64 bg-olive-50 rounded-3xl border border-olive-100"></div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="h-64 bg-white rounded-3xl border border-olive-100"></div>
+            <div className="h-64 bg-white rounded-3xl border border-olive-100"></div>
           </div>
-          <h3 className="text-xl font-bold text-olive-900 mb-2">No crop data found</h3>
-          <p className="text-olive-600 max-w-md">Start building your smart agriculture history by recording your first crop batch.</p>
-          <button onClick={() => setIsModalOpen(true)} className="mt-6 text-olive-600 font-medium hover:text-olive-800 flex items-center gap-1">
-            Add your first field record <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-          </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {crops.map((crop) => (
-            <div key={crop.id} className="bg-white rounded-2xl border border-olive-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden group">
-              <div className="bg-olive-50 px-6 py-4 border-b border-olive-100 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg text-olive-900">{crop.crop_type}</span>
-                </div>
-                <span className="text-xs font-medium bg-white px-2.5 py-1 rounded-full text-olive-600 border border-olive-200">
-                  {crop.created_at ? new Date(crop.created_at).toLocaleDateString() : 'Recent'}
-                </span>
+        <div className="space-y-12">
+          {farm && (
+            <section>
+              <h2 className="text-xl font-bold text-olive-800 mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" /></svg>
+                Active Plot Geo-Map
+              </h2>
+              <div className="bg-white p-2 rounded-[2rem] border border-olive-100 shadow-sm">
+                <PlotGrid farm={farm} crops={crops} onClearSuccess={loadCrops} />
               </div>
-              <div className="p-6">
-                <div className="grid grid-cols-2 gap-y-6 gap-x-4">
-                  <div>
-                    <p className="text-xs text-olive-500 uppercase font-semibold mb-1">Environment</p>
-                    <p className="text-sm text-olive-800 font-medium flex items-center gap-1">
-                      🌡️ {crop.temperature}°C
-                    </p>
-                    <p className="text-sm text-olive-800 font-medium flex items-center gap-1 mt-0.5">
-                      💧 {crop.humidity}%
-                    </p>
-                    <p className="text-sm text-olive-800 font-medium flex items-center gap-1 mt-0.5">
-                      🌧️ {crop.rainfall}mm
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-olive-500 uppercase font-semibold mb-1">Soil Status</p>
-                    <div className="flex gap-2 items-end">
-                      <div className="flex flex-col items-center">
-                        <div className="w-6 h-12 bg-olive-100 rounded-t-sm relative flex items-end justify-center pb-1 text-[10px] font-bold text-olive-800">N
-                          <div className="absolute bottom-0 w-full bg-olive-600 rounded-t-sm opacity-50" style={{ height: `${Math.min(crop.nitrogen_n / 2, 100)}%` }}></div>
-                        </div>
-                        <span className="text-[10px] text-olive-600 mt-1">{crop.nitrogen_n}</span>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <div className="w-6 h-12 bg-olive-100 rounded-t-sm relative flex items-end justify-center pb-1 text-[10px] font-bold text-olive-800">P
-                          <div className="absolute bottom-0 w-full bg-olive-600 rounded-t-sm opacity-50" style={{ height: `${Math.min(crop.phosphorus_p / 2, 100)}%` }}></div>
-                        </div>
-                        <span className="text-[10px] text-olive-600 mt-1">{crop.phosphorus_p}</span>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <div className="w-6 h-12 bg-olive-100 rounded-t-sm relative flex items-end justify-center pb-1 text-[10px] font-bold text-olive-800">K
-                          <div className="absolute bottom-0 w-full bg-olive-600 rounded-t-sm opacity-50" style={{ height: `${Math.min(crop.potassium_k / 2, 100)}%` }}></div>
-                        </div>
-                        <span className="text-[10px] text-olive-600 mt-1">{crop.potassium_k}</span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-olive-600 mt-2 font-medium">pH: {crop.ph_level}</p>
+            </section>
+          )}
+
+          <section>
+            <h2 className="text-xl font-bold text-olive-800 mb-4 flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83" /><path d="M22 12A10 10 0 0 0 12 2v10z" /></svg>
+              Live IoT Sensor Analytics
+            </h2>
+
+            {sensorData.length === 0 ? (
+              <div className="bg-olive-50 rounded-3xl border border-olive-200 border-dashed p-12 text-center text-olive-600">
+                Fetching hardware synchronization telemetry...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-white p-6 rounded-3xl border border-olive-100 shadow-sm">
+                  <h3 className="text-lg font-bold text-olive-900 mb-6 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+                    Live Soil Moisture Density (%)
+                  </h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={sensorData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                        <XAxis dataKey="plot_index" tickFormatter={(val) => `Plot ${val}`} axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} domain={[0, 100]} tick={{ fill: '#6b7280', fontSize: 12 }} dx={-10} />
+                        <RechartsTooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontWeight: 'bold', color: '#1f2937' }} />
+                        <Bar dataKey="soil_moisture" fill="#3b82f6" radius={[6, 6, 0, 0]} name="Moisture Lvl" />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
                 </div>
+
+                <div className="bg-white p-6 rounded-3xl border border-olive-100 shadow-sm">
+                  <h3 className="text-lg font-bold text-olive-900 mb-6 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-pulse shadow-[0_0_10px_rgba(250,204,21,0.5)]"></span>
+                    Sunlight UV Index Cast
+                  </h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={sensorData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                        <XAxis dataKey="plot_index" tickFormatter={(val) => `Plot ${val}`} axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} domain={[0, 12]} tick={{ fill: '#6b7280', fontSize: 12 }} dx={-10} />
+                        <RechartsTooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontWeight: 'bold', color: '#1f2937' }} />
+                        <Line type="monotone" dataKey="sunlight_uv" stroke="#eab308" strokeWidth={4} dot={{ r: 5, fill: '#fff', strokeWidth: 3 }} activeDot={{ r: 8, stroke: '#eab308', strokeWidth: 2, fill: '#fff' }} name="UV Exposure" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            )}
+          </section>
         </div>
       )}
 
@@ -126,6 +159,8 @@ export default function DashboardPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={loadCrops}
+        farm={farm}
+        crops={crops}
       />
     </div>
   );

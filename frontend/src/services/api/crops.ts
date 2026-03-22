@@ -10,7 +10,9 @@ export interface CropData {
   humidity: number;
   rainfall: number;
   ph_level?: number;
+  plot_index?: number;
   created_at?: string;
+  is_active?: boolean;
 }
 
 export const fetchCrops = async (): Promise<CropData[]> => {
@@ -49,5 +51,29 @@ export const addCrop = async (cropData: CropData): Promise<CropData> => {
     throw new Error(error.detail || 'Failed to add crop data');
   }
 
+  return await response.json();
+};
+
+export const clearPlot = async (cropId: string) => {
+  const token = getToken();
+  if (!token) throw new Error("No token");
+
+  const response = await fetch(`${API_URL}/crops/${cropId}/clear`, {
+    method: 'PUT',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error("Failed to clear plot");
+  return await response.json();
+};
+
+export const clearHistory = async () => {
+  const token = getToken();
+  if (!token) throw new Error("No token");
+
+  const response = await fetch(`${API_URL}/crops/history`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) throw new Error("Failed to clear history");
   return await response.json();
 };

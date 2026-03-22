@@ -60,3 +60,24 @@ export const register = async (email: string, password: string) => {
 
   return await response.json();
 };
+
+export const updatePassword = async (currentPassword: string, newPassword: string) => {
+  const token = getToken();
+  if (!token) throw new Error("No authentication token found");
+
+  const response = await fetch(`${API_URL}/auth/password`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.detail || 'Password update failed');
+  }
+
+  return await response.json();
+};

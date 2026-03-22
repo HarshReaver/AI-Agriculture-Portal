@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from datetime import datetime
+from bson.objectid import ObjectId
 from app.mongo import crop_collection
 from app.schemas_mongo import CropData, CropDataCreate
 from app.core.security import ALGORITHM, SECRET_KEY
@@ -25,6 +26,7 @@ def create_crop_data(crop_in: CropDataCreate, current_user_email: str = Depends(
     new_crop = crop_in.model_dump()
     new_crop["user_email"] = current_user_email
     new_crop["created_at"] = datetime.utcnow()
+    new_crop["is_active"] = True
     
     result = crop_collection.insert_one(new_crop)
     
@@ -39,5 +41,21 @@ def read_crop_data(current_user_email: str = Depends(get_current_user_email)):
     results = []
     for doc in cursor:
         doc["id"] = str(doc["_id"])
+        doc.setdefault("is_active", True)
         results.append(CropData(**doc))
     return results
+
+@router.put("/{crop_id}/clear")
+def clear_plot(crop_id: str, current_user_email: str = Depends(get_current_user_email)):
+    result = crop_collection.update_one(
+        {"_id": ObjectId(crop_id), "user_email": current_user_email},
+        {"$set": {"is_active": False}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Crop not found")
+    return {"message": "Plot cleared"}
+
+@router.delete("/history")
+def clear_history(current_user_email: str = Depends(get_current_user_email)):
+    crop_collection.delete_many({"user_email": current_user_email})
+    return {"message": "History cleared"}
