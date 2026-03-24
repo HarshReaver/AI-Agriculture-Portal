@@ -148,7 +148,12 @@ async def generate_crop_insights(
     )
 
     try:
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                response_mime_type="application/json",
+            )
+        )
     except Exception as exc:
         logger.error("Gemini API call failed: %s", exc)
         raise RuntimeError(
