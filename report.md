@@ -12,7 +12,7 @@ The **AI Agriculture Portal** is a comprehensive, sophisticated web application 
 
 ## 2. Theoretical Background
 
-### Problem Statement
+### 2.1 Problem Statement
 **Design a Data Science system for smart agriculture using IoT and AI to improve crop yield.**
 
 ### 2.2 Core Agronomic Metrics
